@@ -14,8 +14,10 @@
       </div>
       <div class="games-grid">
         <% @live_games.each do |event| %>
+          <% event_id = event["id"] || event.dig("match", "id") %>
+          <% next unless event_id.present? %>
           <% teams = event.dig("match", "teams") || [] %>
-          <%= link_to match_path(event["id"] || event.dig("match", "id")), style: "text-decoration: none; color: inherit;" do %>
+          <%= link_to match_path(event_id), style: "text-decoration: none; color: inherit;" do %>
           <div class="game-card" style="cursor: pointer;">
             <div class="teams">
               <% teams.each do |team| %>
