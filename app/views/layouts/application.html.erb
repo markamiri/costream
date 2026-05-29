@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= content_for(:title) || "Costream" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Costream">
+    <meta name="mobile-web-app-capable" content="yes">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= yield :head %>
+
+    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
+    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%# Includes all stylesheet files in app/assets/stylesheets %>
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="min-h-screen" style="background:#edeef0;">
+    <nav class="w-full bg-[#2d2d2d] flex items-center justify-between h-12 fixed top-0 left-0 z-50">
+      <div class="flex items-center h-full">
+        <div class="bg-red-600 h-full flex items-center justify-center px-8" style="clip-path: polygon(0 0, 90% 0, 100% 100%, 0% 100%);">
+          <%= link_to root_path do %>
+            <span class="text-white font-bold text-lg tracking-wide">COSTREAM</span>
+          <% end %>
+        </div>
+        <div class="flex gap-1 text-white text-sm ml-4" style="height:100%;">
+          <!-- ALL -->
+          <a href="/" class="nav-filter-link whitespace-nowrap" style="padding: 0 14px; display:flex; align-items:center; font-size:13px; font-weight:600; text-decoration:none; color:white;">ALL</a>
+
+          <!-- TOP dropdown -->
+          <div class="nav-dropdown-group" style="position:relative; height:100%; display:flex; align-items:center;">
+            <a href="/?filter=top" class="nav-filter-link whitespace-nowrap" style="padding: 0 14px; height:100%; display:flex; align-items:center; font-size:13px; font-weight:600; text-decoration:none; color:white; gap:4px;">
+              TOP
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </a>
+            <div class="nav-dropdown-menu">
+              <a href="/?filter=lck">LCK</a>
+              <a href="/?filter=lpl">LPL</a>
+              <a href="/?filter=lcs">LTA</a>
+              <a href="/?filter=lec">LEC</a>
+              <a href="/?filter=msi">MSI</a>
+              <a href="/?filter=worlds">Worlds</a>
+            </div>
+          </div>
+
+          <!-- WC dropdown -->
+          <div class="nav-dropdown-group" style="position:relative; height:100%; display:flex; align-items:center;">
+            <a href="/?filter=wc" class="nav-filter-link whitespace-nowrap" style="padding: 0 14px; height:100%; display:flex; align-items:center; font-size:13px; font-weight:600; text-decoration:none; color:white; gap:4px;">
+              WC
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </a>
+            <div class="nav-dropdown-menu">
+              <a href="/?filter=lta-south">LTA South</a>
+              <a href="/?filter=vcs">VCS</a>
+              <a href="/?filter=pcs">PCS</a>
+              <a href="/?filter=ljl">LJL</a>
+              <a href="/?filter=lco">LCO</a>
+            </div>
+          </div>
+
+          <!-- ERL dropdown -->
+          <div class="nav-dropdown-group" style="position:relative; height:100%; display:flex; align-items:center;">
+            <a href="/?filter=erl" class="nav-filter-link whitespace-nowrap" style="padding: 0 14px; height:100%; display:flex; align-items:center; font-size:13px; font-weight:600; text-decoration:none; color:white; gap:4px;">
+              ERL
+              <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </a>
+            <div class="nav-dropdown-menu" style="min-width:120px;">
+              <a href="/?filter=al">AL</a>
+              <a href="/?filter=ebl">EBL</a>
+              <a href="/?filter=rol">ROL</a>
+              <a href="/?filter=hm">HM</a>
+              <a href="/?filter=lfl">LFL</a>
+              <a href="/?filter=prm">PRM</a>
+              <a href="/?filter=hll">HLL</a>
+              <a href="/?filter=lit">LIT</a>
+              <a href="/?filter=rl">RL</a>
+              <a href="/?filter=lplol">LPLOL</a>
+              <a href="/?filter=les">LES</a>
+              <a href="/?filter=tcl">TCL</a>
+              <a href="/?filter=nlc">NLC</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="mt-12">
+      <%= yield %>
+    </main>
+  </body>
+</html>

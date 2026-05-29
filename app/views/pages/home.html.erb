@@ -1,0 +1,252 @@
+<div class="page">
+
+  <!-- Left Sidebar -->
+  <aside class="sidebar left">
+    <div class="card">Quick Links</div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="content">
+    <% if @live_games.any? %>
+    <div class="card scoreboard">
+      <div class="scoreboard-header">
+        <h2>LIVE GAMES</h2>
+      </div>
+      <div class="games-grid">
+        <% @live_games.each do |event| %>
+          <% teams = event.dig("match", "teams") || [] %>
+          <%= link_to match_path(event["id"] || event.dig("match", "id")), style: "text-decoration: none; color: inherit;" do %>
+          <div class="game-card" style="cursor: pointer;">
+            <div class="teams">
+              <% teams.each do |team| %>
+                <div class="team">
+                  <img src="<%= team.dig("image") %>" alt="<%= team["name"] %>" style="background:#c8ccd4; padding:3px;" onerror="this.src='https://via.placeholder.com/25'">
+                  <span class="<%= team["result"]&.dig("outcome") == "win" ? "winner" : "" %>"><%= team["name"] %></span>
+                  <span class="team-score"><%= team.dig("result", "gameWins") %></span>
+                </div>
+              <% end %>
+            </div>
+            <div class="status">
+              <span style="color: red; font-weight: bold; font-size: 11px;">● LIVE</span>
+              <span class="status-league"><%= event.dig("league", "name") %></span>
+            </div>
+          </div>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+    <% end %>
+
+    <div class="card scoreboard">
+      <div class="scoreboard-header">
+        <h2>UPCOMING GAMES</h2>
+      </div>
+      <div class="games-grid" id="upcoming-games-grid">
+        <% if @upcoming_games.any? %>
+          <% @upcoming_games.each do |event| %>
+            <% teams = event.dig("match", "teams") || [] %>
+            <div class="game-card">
+              <div class="teams">
+                <% teams.each do |team| %>
+                  <div class="team">
+                    <img src="<%= team.dig("image") %>" alt="<%= team["name"] %>" style="background:#c8ccd4; padding:3px;" onerror="this.src='https://via.placeholder.com/25'">
+                    <span><%= team["name"] %></span>
+                  </div>
+                <% end %>
+              </div>
+              <div class="status">
+                <span class="status-league"><%= event.dig("league", "name") %></span>
+                <button class="highlight-btn local-time" data-utc="<%= event["startTime"] %>">
+                  <%= event["startTime"] ? event["startTime"] : "TBD" %>
+                </button>
+              </div>
+            </div>
+          <% end %>
+        <% else %>
+          <div style="grid-column: 1 / -1; text-align: center; color: #888; padding: 40px 0;">
+            No upcoming games.
+          </div>
+        <% end %>
+      </div>
+
+      <% if @upcoming_newer_token.present? %>
+        <div style="display:flex; justify-content:center; padding: 12px 0 4px;">
+          <button id="load-more-upcoming"
+            data-token="<%= @upcoming_newer_token %>"
+            style="background:none; border:1px solid #d1d5db; border-radius:50%; width:32px; height:32px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#6b7280;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </div>
+      <% end %>
+    </div>
+
+    <script>
+      function formatLocalTime(utcStr) {
+        if (!utcStr) return 'TBD';
+        return new Date(utcStr).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      }
+      document.querySelectorAll('.local-time[data-utc]').forEach(function(el) {
+        el.textContent = formatLocalTime(el.dataset.utc);
+      });
+    </script>
+
+    <script>
+      (function() {
+        const btn = document.getElementById('load-more-upcoming');
+        if (!btn) return;
+
+        btn.addEventListener('click', async function() {
+          const token = btn.dataset.token;
+          btn.disabled = true;
+          btn.style.opacity = '0.4';
+
+          const filter = '<%= @filter.to_s %>';
+          const res = await fetch('/api/upcoming_games?pageToken=' + encodeURIComponent(token) + (filter ? '&filter=' + encodeURIComponent(filter) : ''));
+          const data = await res.json();
+          const grid = document.getElementById('upcoming-games-grid');
+
+          (data.events || []).forEach(function(event) {
+            const teams = (event.match && event.match.teams) || [];
+            const league = (event.league && event.league.name) || '';
+            const time = event.startTime ? new Date(event.startTime).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'TBD';
+
+            const teamsHtml = teams.map(function(team) {
+              return `<div class="team">
+                <img src="${team.image || ''}" alt="${team.name || ''}" style="background:#c8ccd4; padding:3px;" onerror="this.src='https://via.placeholder.com/25'">
+                <span>${team.name || ''}</span>
+              </div>`;
+            }).join('');
+
+            const card = document.createElement('div');
+            card.className = 'game-card';
+            card.innerHTML = `<div class="teams">${teamsHtml}</div>
+              <div class="status">
+                <span class="status-league">${league}</span>
+                <button class="highlight-btn">${formatLocalTime(event.startTime)}</button>
+              </div>`;
+            grid.appendChild(card);
+          });
+
+          if (data.newerToken) {
+            btn.dataset.token = data.newerToken;
+            btn.disabled = false;
+            btn.style.opacity = '1';
+          } else {
+            btn.remove();
+          }
+        });
+      })();
+    </script>
+    <div class="card scoreboard">
+      <div class="scoreboard-header">
+        <h2>RECENT GAMES</h2>
+      </div>
+      <div class="games-grid" id="recent-games-grid">
+        <% if @recent_games.any? %>
+          <% @recent_games.reverse.each do |event| %>
+            <% teams = event.dig("match", "teams") || [] %>
+            <a href="<%= match_path(event["id"] || event.dig("match", "id")) %>" style="text-decoration: none; color: inherit;">
+              <div class="game-card" style="cursor: pointer;">
+                <div class="teams">
+                  <% teams.each do |team| %>
+                    <div class="team">
+                      <img src="<%= team.dig("image") %>" alt="<%= team["name"] %>" style="background:#c8ccd4; padding:3px;" onerror="this.src='https://via.placeholder.com/25'">
+                      <span class="<%= team.dig("result", "outcome") == "win" ? "winner" : "" %>"><%= team["name"] %></span>
+                      <span class="team-score"><%= team.dig("result", "gameWins") %></span>
+                    </div>
+                  <% end %>
+                </div>
+                <div class="status">
+                  <span class="status-league"><%= event.dig("league", "name") %></span>
+                  <span style="font-size:11px; color:#aaa;">
+                    <%= event["startTime"] ? Time.parse(event["startTime"]).strftime("%b %-d") : "" %>
+                  </span>
+                </div>
+              </div>
+            </a>
+          <% end %>
+        <% else %>
+          <div style="grid-column: 1 / -1; text-align: center; color: #888; padding: 40px 0;">
+            No recent games found.
+          </div>
+        <% end %>
+      </div>
+
+      <% if @recent_older_token.present? %>
+        <div style="display:flex; justify-content:center; padding: 12px 0 4px;">
+          <button id="load-more-recent"
+            data-token="<%= @recent_older_token %>"
+            style="background:none; border:1px solid #d1d5db; border-radius:50%; width:32px; height:32px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#6b7280;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+        </div>
+      <% end %>
+    </div>
+
+    <script>
+      (function() {
+        const btn = document.getElementById('load-more-recent');
+        if (!btn) return;
+
+        btn.addEventListener('click', async function() {
+          const token = btn.dataset.token;
+          btn.disabled = true;
+          btn.style.opacity = '0.4';
+
+          const filter = '<%= @filter.to_s %>';
+          const res = await fetch('/api/recent_games?pageToken=' + encodeURIComponent(token) + (filter ? '&filter=' + encodeURIComponent(filter) : ''));
+          const data = await res.json();
+          const grid = document.getElementById('recent-games-grid');
+
+          (data.events || []).reverse().forEach(function(event) {
+            const teams = (event.match && event.match.teams) || [];
+            const matchId = event.id || (event.match && event.match.id);
+            const league = (event.league && event.league.name) || '';
+            const date = event.startTime ? new Date(event.startTime).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+
+            const teamsHtml = teams.map(function(team) {
+              const isWin = team.result && team.result.outcome === 'win';
+              const score = team.result && team.result.gameWins != null ? team.result.gameWins : '';
+              return `<div class="team">
+                <img src="${team.image || ''}" alt="${team.name || ''}" style="background:#c8ccd4; padding:3px;" onerror="this.src='https://via.placeholder.com/25'">
+                <span class="${isWin ? 'winner' : ''}">${team.name || ''}</span>
+                <span class="team-score">${score}</span>
+              </div>`;
+            }).join('');
+
+            const card = document.createElement('a');
+            card.href = '/matches/' + matchId;
+            card.style.cssText = 'text-decoration:none; color:inherit;';
+            card.innerHTML = `<div class="game-card" style="cursor:pointer;">
+              <div class="teams">${teamsHtml}</div>
+              <div class="status">
+                <span class="status-league">${league}</span>
+                <span style="font-size:11px; color:#aaa;">${date}</span>
+              </div>
+            </div>`;
+            grid.appendChild(card);
+          });
+
+          if (data.olderToken) {
+            btn.dataset.token = data.olderToken;
+            btn.disabled = false;
+            btn.style.opacity = '1';
+          } else {
+            btn.remove();
+          }
+        });
+      })();
+    </script>
+  </main>
+
+  <!-- Right Sidebar -->
+  <aside class="sidebar right">
+    <div class="card">Top Headlines</div>
+    <div class="card">Extra Widget</div>
+  </aside>
+
+</div>

@@ -1,0 +1,805 @@
+<style>
+  @media (max-width: 640px) {
+    .mh-wrap { padding: 8px 12px !important; }
+    .mh-inner { flex-wrap: wrap !important; gap: 4px !important; }
+    .mh-team { flex: 1 !important; min-width: 0 !important; }
+    .mh-team-logo { width: 36px !important; height: 36px !important; }
+    .mh-team-name { font-size: 11px !important; }
+    .mh-dragons { display: none !important; }
+    .mh-center { order: 3; width: 100% !important; flex-shrink: 0 !important; gap: 10px !important; justify-content: center; margin-top: 6px; border-top: 1px solid #eee; padding-top: 6px; }
+    .mh-stats-group { gap: 10px !important; }
+    .mh-stat svg { width: 16px !important; height: 16px !important; }
+    .mh-stat span { font-size: 12px !important; }
+    .mh-score { min-width: unset !important; font-size: 14px !important; }
+    .mh-score-label { font-size: 9px !important; }
+    .mh-score-time { font-size: 11px !important; }
+    .match-body { flex-direction: column !important; margin: 12px auto !important; padding: 0 8px !important; }
+    .match-objectives { width: 100% !important; }
+    .col-mobile-hide { display: none !important; }
+    .player-table { font-size: 12px !important; }
+  }
+</style>
+
+<% if @event.nil? %>
+  <div style="text-align:center; padding: 60px; color: #888;">Failed to load match data.</div>
+<% else %>
+  <% selected_index = @default_game_index
+     game = @games[selected_index] || @games.first %>
+
+  <%# Determine blue/red by the game's team side field, then match to match-level teams by ID %>
+  <% game_blue = game&.dig("teams")&.find { |t| t["side"] == "blue" }
+     game_red  = game&.dig("teams")&.find { |t| t["side"] == "red" }
+     blue_team = @teams.find { |t| t["id"] == game_blue&.dig("id") } || @teams[0]
+     red_team  = @teams.find { |t| t["id"] == game_red&.dig("id")  } || @teams[1] %>
+
+  <!-- Sticky Scoreboard Header (MatchDetails.js style) -->
+  <div class="mh-wrap" style="position:sticky; top:48px; z-index:40; background:white; border-bottom:1px solid #cecfcf; padding:20px 24px; box-shadow:0 1px 4px rgba(0,0,0,0.08);">
+    <div class="mh-inner" style="display:flex; align-items:center; justify-content:space-between; max-width:1100px; margin:0 auto; gap:8px;">
+
+      <!-- Left Team -->
+      <div class="mh-team" style="display:flex; flex-direction:column; gap:4px; min-width:0; flex-shrink:1;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <img class="mh-team-logo" src="<%= blue_team&.dig("image") %>" alt="<%= blue_team&.dig("name") %>"
+               style="width:56px; height:56px; object-fit:contain; background:#c8ccd4; padding:4px; border-bottom:4px solid #5383e8;"
+               onerror="this.src='https://via.placeholder.com/56'">
+          <div>
+            <div class="mh-team-name" style="font-size:13px; font-weight:700; color:#111;"><%= blue_team&.dig("name") %></div>
+            <div id="blue-outcome-badge" style="display:none; font-size:11px; font-weight:700; padding:2px 6px; border-radius:4px;"></div>
+          </div>
+        </div>
+        <div id="blue-dragons" class="mh-dragons" style="display:flex; flex-wrap:wrap; gap:2px; min-height:18px;"></div>
+      </div>
+
+      <!-- Center Stats (Aureom style) -->
+      <div class="mh-center" style="display:flex; align-items:center; gap:28px; color:#555d64; font-size:14px; font-weight:600; flex-shrink:0;">
+
+        <!-- Blue side: inhibs, barons, towers, gold, kills -->
+        <div class="mh-stats-group" style="display:flex; align-items:center; gap:28px;">
+          <div class="mh-stat" style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M12,2 C17.522,2 22,6.478 22,12 C22,17.522 17.522,22 12,22 C6.477,22 2,17.522 2,12 C2,6.478 6.477,2 12,2 Z M12,4 C7.639,4 4,7.635 4,12 C4,16.365 7.639,20 12,20 C16.362,20 20,16.365 20,12 C20,7.635 16.362,4 12,4 Z M12,8 L16,12 L12,16 L8,12 L12,8 Z"/></svg>
+            <span id="live-blue-inhibitors" style="font-size:15px;"><%= game&.dig("teams", 0, "objectives", "inhibitor", "kills") || 0 %></span>
+          </div>
+          <div class="mh-stat" style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M22,5.9999 L15,1.9999 L15,3.9999 L18,6.9999 L16,8.9999 L12,4.9999 L8,8.9999 L6,6.9999 L9,3.9999 L9,1.9999 L2,5.9999 L6,10.9999 L2,14.9999 L5,18.9999 L5,14.9999 L7,14.9999 L8,19.9999 L10,21.9999 L10,17.9999 L12,19.9999 L14,17.9999 L14,21.9999 L16,19.9999 L17,14.9999 L19,14.9999 L19,18.9999 L22,14.9999 L18,10.9999 L22,5.9999 Z"/></svg>
+            <span id="live-blue-barons" style="font-size:15px;"><%= game&.dig("teams", 0, "objectives", "baron", "kills") || 0 %></span>
+          </div>
+          <div class="mh-stat" style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M9,1 L9,6 L7,5 L4,7 L5,11 L12,15 L19,11 L20,7 L17,5 L15,6 L15,1 Z M11,6 L11,3 L13,3 L13,6 L12,7 L11,6 Z M16,9 L12,12 L8,9 L12,10 Z M12,17 L16,15 L15,21 L17,21 L17,23 L7,23 L7,21 L9,21 L8,15 Z"/></svg>
+            <span id="live-blue-towers" style="font-size:15px;"><%= game&.dig("teams", 0, "objectives", "tower", "kills") || 0 %></span>
+          </div>
+          <div class="mh-stat" style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <svg width="22" height="22" viewBox="0 0 16 16"><g fill="#555d64" fill-rule="evenodd"><path d="M13,6.86C13,8,11.21,9,9,9S5,8,5,6.86V5.14C5,4,6.79,3,9,3s4,1,4,2.14Z"/><path d="M7,7.71a4,4,0,0,1,2.4.64v1.3a4,4,0,0,1-2.4.64,4,4,0,0,1-2.4-.64V8.35A4,4,0,0,1,7,7.71M7,6C4.79,6,3,7,3,8.14V9.86C3,11,4.79,12,7,12s4-1,4-2.14V8.14C11,7,9.21,6,7,6Z"/></g></svg>
+            <span id="live-blue-gold" style="font-size:15px;">—</span>
+          </div>
+          <div class="mh-stat" style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M16,3 L9.001,12 L9.001,13.5 L6,10.5 L5,14 L6.501,15.5 L3,19 L3,21 L5,21 L8.5,17.5 L10.001,19 L13.501,18 L10.5,15 L12,15 L21,8 L21,3 Z M10.5,12.75 L17.001,6 L18.001,6 L18.001,7 L11.251,13.5 L10.5,13.5 Z"/></svg>
+            <span id="live-blue-kills" style="font-size:15px;"><%= game&.dig("teams", 0, "objectives", "champion", "kills") || 0 %></span>
+          </div>
+        </div>
+
+        <!-- Center Status -->
+        <div class="mh-score" style="display:flex; flex-direction:column; align-items:center; gap:2px; min-width:80px;">
+          <span id="game-status-label" class="mh-score-label" style="font-size:10px; text-transform:uppercase; color:#9ca3af; font-weight:400;">
+            <%= game&.dig("state") == "completed" ? "Final" : "Live" %>
+          </span>
+          <div id="live-game-time" class="mh-score-time" style="font-size:13px; font-weight:bold; color:<%= game&.dig("state") == "completed" ? '#6b7280' : '#ef4444' %>;">
+            <%= game&.dig("state") == "completed" ? "Final" : "⬤ LIVE" %>
+          </div>
+          <div style="font-size:18px; font-weight:bold; color:#111;">
+            <%= blue_team&.dig("result", "gameWins") || 0 %> – <%= red_team&.dig("result", "gameWins") || 0 %>
+          </div>
+        </div>
+
+        <!-- Red side: kills, gold, towers, barons, inhibs -->
+        <div class="mh-stats-group" style="display:flex; align-items:center; gap:28px;">
+          <div class="mh-stat" style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M16,3 L9.001,12 L9.001,13.5 L6,10.5 L5,14 L6.501,15.5 L3,19 L3,21 L5,21 L8.5,17.5 L10.001,19 L13.501,18 L10.5,15 L12,15 L21,8 L21,3 Z M10.5,12.75 L17.001,6 L18.001,6 L18.001,7 L11.251,13.5 L10.5,13.5 Z"/></svg>
+            <span id="live-red-kills" style="font-size:15px;"><%= game&.dig("teams", 1, "objectives", "champion", "kills") || 0 %></span>
+          </div>
+          <div class="mh-stat" style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <svg width="22" height="22" viewBox="0 0 16 16"><g fill="#555d64" fill-rule="evenodd"><path d="M13,6.86C13,8,11.21,9,9,9S5,8,5,6.86V5.14C5,4,6.79,3,9,3s4,1,4,2.14Z"/><path d="M7,7.71a4,4,0,0,1,2.4.64v1.3a4,4,0,0,1-2.4.64,4,4,0,0,1-2.4-.64V8.35A4,4,0,0,1,7,7.71M7,6C4.79,6,3,7,3,8.14V9.86C3,11,4.79,12,7,12s4-1,4-2.14V8.14C11,7,9.21,6,7,6Z"/></g></svg>
+            <span id="live-red-gold" style="font-size:15px;">—</span>
+          </div>
+          <div class="mh-stat" style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M9,1 L9,6 L7,5 L4,7 L5,11 L12,15 L19,11 L20,7 L17,5 L15,6 L15,1 Z M11,6 L11,3 L13,3 L13,6 L12,7 L11,6 Z M16,9 L12,12 L8,9 L12,10 Z M12,17 L16,15 L15,21 L17,21 L17,23 L7,23 L7,21 L9,21 L8,15 Z"/></svg>
+            <span id="live-red-towers" style="font-size:15px;"><%= game&.dig("teams", 1, "objectives", "tower", "kills") || 0 %></span>
+          </div>
+          <div class="mh-stat" style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M22,5.9999 L15,1.9999 L15,3.9999 L18,6.9999 L16,8.9999 L12,4.9999 L8,8.9999 L6,6.9999 L9,3.9999 L9,1.9999 L2,5.9999 L6,10.9999 L2,14.9999 L5,18.9999 L5,14.9999 L7,14.9999 L8,19.9999 L10,21.9999 L10,17.9999 L12,19.9999 L14,17.9999 L14,21.9999 L16,19.9999 L17,14.9999 L19,14.9999 L19,18.9999 L22,14.9999 L18,10.9999 L22,5.9999 Z"/></svg>
+            <span id="live-red-barons" style="font-size:15px;"><%= game&.dig("teams", 1, "objectives", "baron", "kills") || 0 %></span>
+          </div>
+          <div class="mh-stat" style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+            <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M12,2 C17.522,2 22,6.478 22,12 C22,17.522 17.522,22 12,22 C6.477,22 2,17.522 2,12 C2,6.478 6.477,2 12,2 Z M12,4 C7.639,4 4,7.635 4,12 C4,16.365 7.639,20 12,20 C16.362,20 20,16.365 20,12 C20,7.635 16.362,4 12,4 Z M12,8 L16,12 L12,16 L8,12 L12,8 Z"/></svg>
+            <span id="live-red-inhibitors" style="font-size:15px;"><%= game&.dig("teams", 1, "objectives", "inhibitor", "kills") || 0 %></span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Team -->
+      <div class="mh-team" style="display:flex; flex-direction:column; gap:4px; min-width:0; flex-shrink:1; align-items:flex-end;">
+        <div style="display:flex; align-items:center; gap:8px; flex-direction:row-reverse;">
+          <img class="mh-team-logo" src="<%= red_team&.dig("image") %>" alt="<%= red_team&.dig("name") %>"
+               style="width:56px; height:56px; object-fit:contain; background:#c8ccd4; padding:4px; border-bottom:4px solid #e84057;"
+               onerror="this.src='https://via.placeholder.com/56'">
+          <div style="text-align:right;">
+            <div class="mh-team-name" style="font-size:13px; font-weight:700; color:#111;"><%= red_team&.dig("name") %></div>
+            <div id="red-outcome-badge" style="display:none; font-size:11px; font-weight:700; padding:2px 6px; border-radius:4px;"></div>
+          </div>
+        </div>
+        <div id="red-dragons" class="mh-dragons" style="display:flex; flex-wrap:wrap; gap:2px; justify-content:flex-end; min-height:18px;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Catching up banner -->
+  <div id="catchup-banner" style="display:none; text-align:center; padding:6px 0; background:#fefce8; border-bottom:1px solid #fde68a; font-size:12px; color:#92400e;">
+    ⏳ <span id="catchup-text">Catching up to live...</span>
+  </div>
+
+  <!-- Game Selector -->
+  <% played_games = @games.each_with_index.select { |g, _| %w[completed inProgress].include?(g["state"]) } %>
+  <% if played_games.size > 1 %>
+    <div style="display:flex; justify-content:center; gap:12px; padding:12px 0;">
+      <% played_games.each do |g, i| %>
+        <a href="?game=<%= i %>"
+           style="padding: 6px 16px; border-radius: 6px; font-weight: bold; text-decoration: none;
+                  background: <%= selected_index == i ? '#2563eb' : 'white' %>;
+                  color: <%= selected_index == i ? 'white' : '#374151' %>;
+                  border: 1px solid <%= selected_index == i ? '#2563eb' : '#d1d5db' %>;">
+          G<%= g["gameNumber"] || i + 1 %>
+        </a>
+      <% end %>
+    </div>
+  <% end %>
+
+  <!-- Main Body: player tables + right objectives panel -->
+  <div class="match-body" style="display:flex; flex-direction:row; gap:24px; max-width:1100px; margin:24px auto; padding:0 16px;">
+
+    <!-- LEFT: Player Tables -->
+    <div style="flex:1; display:flex; flex-direction:column; gap:0; background:white; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.08); overflow:hidden;">
+
+      <!-- Blue Team -->
+      <div style="padding:12px 16px 4px; background:#eff6ff; border-bottom:2px solid #2563eb;">
+        <h2 style="font-size:15px; font-weight:bold; color:#1e40af;"><%= blue_team&.dig("name") %></h2>
+      </div>
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid #e5e7eb; color:#6b7280; font-size:11px; text-transform:uppercase; background:#f8fafc;">
+            <th style="padding:6px 16px; text-align:left; min-width:160px; border-right:1px solid #e5e7eb;">Player</th>
+            <th class="col-mobile-hide" style="padding:6px 8px; text-align:left; min-width:170px;">Items</th>
+            <th style="padding:6px 8px; text-align:center; width:80px;">KDA</th>
+            <th style="padding:6px 8px; text-align:center; width:50px;">CS</th>
+            <th style="padding:6px 8px; text-align:center; width:60px;">Gold</th>
+            <th class="col-mobile-hide" style="padding:6px 8px; text-align:center; width:55px;">+/-</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% (1..5).each do |i| %>
+            <tr data-pid="<%= i %>" style="border-bottom:1px solid #f3f4f6; background:<%= i.odd? ? 'white' : '#f9fafb' %>;">
+              <td style="padding:8px 16px; border-right:1px solid #e5e7eb;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <img class="live-champ-img" src="" style="width:28px;height:28px;border-radius:50%;background:#e5e7eb;" onerror="this.src='https://via.placeholder.com/28'">
+                  <div>
+                    <div style="display:flex; align-items:center; gap:4px;">
+                      <span class="live-champ-name" style="font-weight:600; color:#0066cc; font-size:12px;">—</span>
+                      <span class="live-level" style="font-size:10px; background:#e5e7eb; border-radius:3px; padding:1px 3px; color:#374151;">1</span>
+                    </div>
+                    <div class="live-player-name" style="font-size:11px; color:#6b7280;">—</div>
+                  </div>
+                  <div style="margin-left:4px; flex:1;">
+                    <div class="live-hp-bar" style="width:100%; height:5px; background:#e5e7eb; border-radius:3px;">
+                      <div class="live-hp-fill" style="height:100%; width:100%; background:#22c55e; border-radius:3px;"></div>
+                    </div>
+                    <div class="live-hp-text" style="font-size:9px; color:#9ca3af; margin-top:1px;">—</div>
+                  </div>
+                </div>
+              </td>
+              <td class="col-mobile-hide" style="padding:8px;">
+                <div class="live-items" style="display:flex; gap:2px; align-items:center;">
+                  <% 7.times do %><div style="width:22px;height:22px;background:#e5e7eb;border-radius:3px;"></div><% end %>
+                </div>
+              </td>
+              <td style="padding:8px; text-align:center; color:#6c6d6f; font-size:12px;">
+                <span class="live-kills">—</span>/<span class="live-deaths">—</span>/<span class="live-assists">—</span>
+              </td>
+              <td style="padding:8px; text-align:center; color:#6c6d6f; font-size:12px;"><span class="live-cs">—</span></td>
+              <td style="padding:8px; text-align:center; font-size:12px;"><span class="live-gold" style="color:#6c6d6f;">—</span></td>
+              <td class="col-mobile-hide" style="padding:8px; text-align:center; font-size:12px;"><span class="live-gold-diff">—</span></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+
+      <!-- Red Team -->
+      <div style="padding:12px 16px 4px; background:#fff1f2; border-top:2px solid #e5e7eb; border-bottom:2px solid #dc2626; margin-top:8px;">
+        <h2 style="font-size:15px; font-weight:bold; color:#991b1b;"><%= red_team&.dig("name") %></h2>
+      </div>
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead>
+          <tr style="border-bottom:1px solid #e5e7eb; color:#6b7280; font-size:11px; text-transform:uppercase; background:#f8fafc;">
+            <th style="padding:6px 16px; text-align:left; min-width:160px; border-right:1px solid #e5e7eb;">Player</th>
+            <th class="col-mobile-hide" style="padding:6px 8px; text-align:left; min-width:170px;">Items</th>
+            <th style="padding:6px 8px; text-align:center; width:80px;">KDA</th>
+            <th style="padding:6px 8px; text-align:center; width:50px;">CS</th>
+            <th style="padding:6px 8px; text-align:center; width:60px;">Gold</th>
+            <th class="col-mobile-hide" style="padding:6px 8px; text-align:center; width:55px;">+/-</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% (6..10).each do |i| %>
+            <tr data-pid="<%= i %>" style="border-bottom:1px solid #f3f4f6; background:<%= i.even? ? 'white' : '#f9fafb' %>;">
+              <td style="padding:8px 16px; border-right:1px solid #e5e7eb;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <img class="live-champ-img" src="" style="width:28px;height:28px;border-radius:50%;background:#e5e7eb;" onerror="this.src='https://via.placeholder.com/28'">
+                  <div>
+                    <div style="display:flex; align-items:center; gap:4px;">
+                      <span class="live-champ-name" style="font-weight:600; color:#0066cc; font-size:12px;">—</span>
+                      <span class="live-level" style="font-size:10px; background:#e5e7eb; border-radius:3px; padding:1px 3px; color:#374151;">1</span>
+                    </div>
+                    <div class="live-player-name" style="font-size:11px; color:#6b7280;">—</div>
+                  </div>
+                  <div style="margin-left:4px; flex:1;">
+                    <div class="live-hp-bar" style="width:100%; height:5px; background:#e5e7eb; border-radius:3px;">
+                      <div class="live-hp-fill" style="height:100%; width:100%; background:#22c55e; border-radius:3px;"></div>
+                    </div>
+                    <div class="live-hp-text" style="font-size:9px; color:#9ca3af; margin-top:1px;">—</div>
+                  </div>
+                </div>
+              </td>
+              <td class="col-mobile-hide" style="padding:8px;">
+                <div class="live-items" style="display:flex; gap:2px; align-items:center;">
+                  <% 7.times do %><div style="width:22px;height:22px;background:#e5e7eb;border-radius:3px;"></div><% end %>
+                </div>
+              </td>
+              <td style="padding:8px; text-align:center; color:#6c6d6f; font-size:12px;">
+                <span class="live-kills">—</span>/<span class="live-deaths">—</span>/<span class="live-assists">—</span>
+              </td>
+              <td style="padding:8px; text-align:center; color:#6c6d6f; font-size:12px;"><span class="live-cs">—</span></td>
+              <td style="padding:8px; text-align:center; font-size:12px;"><span class="live-gold" style="color:#6c6d6f;">—</span></td>
+              <td class="col-mobile-hide" style="padding:8px; text-align:center; font-size:12px;"><span class="live-gold-diff">—</span></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+
+    </div>
+
+    <!-- RIGHT: Team Objectives -->
+    <div class="match-objectives" style="width:260px; flex-shrink:0;">
+      <div style="background:white; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.08); padding:16px;">
+        <h3 style="font-weight:bold; text-align:center; margin-bottom:16px; color:#374151; font-size:15px;">Team Objectives</h3>
+
+        <% dragon_svg   = '<svg width="22" height="22" viewBox="0 0 14 18" xmlns="http://www.w3.org/2000/svg"><path fill="#555d64" d="M6.185725,0 C6.185725,0 6.68325,2.9099 6.23805,3.343375 C5.79285,3.77685 2.274125,7.10675 2.274125,7.10675 L1.1004,5.78095 L0,9.82625 C0,9.82625 1.6954,11.38935 2.48955,14.728 L7,17 L13.4652,12.0666 L14,9.041025 L12.7162,7.765625 C12.7162,7.765625 12.951225,9.4052 12.354825,9.4052 C11.75825,9.4052 10.6764,6.8957 9.88715,6.8957 C9.098075,6.8957 8.401575,7.10115 6.9097,7.4508 C5.718475,7.7301 5.26015,9.698675 5.12365,10.48075 C5.090225,10.6729 5.171425,10.8668 5.33435,10.97985 L6.9097,12.347825 C6.9097,12.347825 8.385125,11.378325 8.385125,10.723825 C8.385125,10.221575 7.146825,10.252025 7.146825,9.30265 C7.146825,8.75 7.6391,8.52985 8.262625,8.52985 C9.99355,8.52985 10.6708,10.5721 10.6708,10.5721 C9.404675,13.03785 6.9951,14.595 6.9951,14.595 C6.9951,14.595 3.436475,12.154625 3.436475,10.63195 C3.436475,6.427225 8.33595,5.31125 8.33595,5.31125 L8.98555,3.1598 L6.185725,0 Z"/></svg>'
+          baron_svg    = '<svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M22,5.9999 L15,1.9999 L15,3.9999 L18,6.9999 L16,8.9999 L12,4.9999 L8,8.9999 L6,6.9999 L9,3.9999 L9,1.9999 L2,5.9999 L6,10.9999 L2,14.9999 L5,18.9999 L5,14.9999 L7,14.9999 L8,19.9999 L10,21.9999 L10,17.9999 L12,19.9999 L14,17.9999 L14,21.9999 L16,19.9999 L17,14.9999 L19,14.9999 L19,18.9999 L22,14.9999 L18,10.9999 L22,5.9999 Z"/></svg>'
+          tower_svg    = '<svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M9,1 L9,6 L7,5 L4,7 L5,11 L12,15 L19,11 L20,7 L17,5 L15,6 L15,1 Z M11,6 L11,3 L13,3 L13,6 L12,7 L11,6 Z M16,9 L12,12 L8,9 L12,10 Z M12,17 L16,15 L15,21 L17,21 L17,23 L7,23 L7,21 L9,21 L8,15 Z"/></svg>'
+          inhibitor_svg= '<svg width="22" height="22" viewBox="0 0 24 24"><path fill="#555d64" d="M12,2 C17.522,2 22,6.478 22,12 C22,17.522 17.522,22 12,22 C6.477,22 2,17.522 2,12 C2,6.478 6.477,2 12,2 Z M12,4 C7.639,4 4,7.635 4,12 C4,16.365 7.639,20 12,20 C16.362,20 20,16.365 20,12 C20,7.635 16.362,4 12,4 Z M12,8 L16,12 L12,16 L8,12 L12,8 Z"/></svg>'
+        %>
+        <% [
+          { key: "dragon",   label: "Dragons", svg: dragon_svg,    blue_val: game&.dig("teams",0,"objectives","dragon","kills") || 0, red_val: game&.dig("teams",1,"objectives","dragon","kills") || 0 },
+          { key: "baron",    label: "Barons",  svg: baron_svg,     blue_val: game&.dig("teams",0,"objectives","baron","kills") || 0,  red_val: game&.dig("teams",1,"objectives","baron","kills") || 0 },
+          { key: "tower",    label: "Towers",  svg: tower_svg,     blue_val: game&.dig("teams",0,"objectives","tower","kills") || 0,  red_val: game&.dig("teams",1,"objectives","tower","kills") || 0 },
+          { key: "inhibitor",label: "Inhibs",  svg: inhibitor_svg, blue_val: game&.dig("teams",0,"objectives","inhibitor","kills") || 0, red_val: game&.dig("teams",1,"objectives","inhibitor","kills") || 0 },
+        ].each do |obj| %>
+          <div style="display:grid; grid-template-columns:1fr 48px 1fr; align-items:center; gap:8px; margin-bottom:14px;">
+            <!-- Blue -->
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <span id="live-obj-blue-<%= obj[:key] %>" style="font-size:18px; font-weight:bold; color:#2563eb;"><%= obj[:blue_val] %></span>
+              <div style="width:56px; height:6px; background:#dbeafe; border-radius:3px; margin-top:4px;">
+                <div style="height:100%; width:<%= obj[:blue_val].to_i > 0 ? [obj[:blue_val].to_i * 20, 100].min : 0 %>%; background:#2563eb; border-radius:3px;"></div>
+              </div>
+            </div>
+            <!-- Icon + Label -->
+            <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
+              <%= obj[:svg].html_safe %>
+              <span style="font-size:10px; color:#9ca3af; text-transform:uppercase;"><%= obj[:label] %></span>
+            </div>
+            <!-- Red -->
+            <div style="display:flex; flex-direction:column; align-items:center;">
+              <span id="live-obj-red-<%= obj[:key] %>" style="font-size:18px; font-weight:bold; color:#dc2626;"><%= obj[:red_val] %></span>
+              <div style="width:56px; height:6px; background:#fee2e2; border-radius:3px; margin-top:4px;">
+                <div style="height:100%; width:<%= obj[:red_val].to_i > 0 ? [obj[:red_val].to_i * 20, 100].min : 0 %>%; background:#dc2626; border-radius:3px;"></div>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <!-- Gold bar -->
+        <div style="margin-top:8px;">
+          <div style="font-size:10px; text-transform:uppercase; color:#9ca3af; text-align:center; margin-bottom:4px;">Total Gold</div>
+          <div style="display:flex; height:8px; border-radius:4px; overflow:hidden;">
+            <div id="live-gold-bar-blue" style="height:100%; background:#2563eb; width:50%;"></div>
+            <div id="live-gold-bar-red" style="height:100%; background:#dc2626; width:50%;"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:11px; font-weight:bold;">
+            <span id="live-blue-gold-total" style="color:#2563eb;">—</span>
+            <span id="live-red-gold-total" style="color:#dc2626;">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <% game_id = game&.dig("id") %>
+  <% if game_id.present? %>
+    <script>
+      (function() {
+        if (window._livePolling) { clearInterval(window._livePolling); }
+
+        const GAME_ID = "<%= game_id %>";
+        const PATCH_VERSION = "16.10.1";
+        let metadata = null;
+
+        function getRow(pid) {
+          return document.querySelector(`[data-pid="${pid}"]`);
+        }
+
+        function updatePlayerRow(row, player) {
+          if (!row) return;
+          const patch = window._lolPatch || PATCH_VERSION;
+
+          if (metadata) {
+            const isBlue = player.participantId <= 5;
+            const teamMeta = isBlue ? metadata.blueTeamMetadata : metadata.redTeamMetadata;
+            const idx = isBlue ? player.participantId - 1 : player.participantId - 6;
+            const pm = teamMeta?.participantMetadata?.[idx];
+            if (pm) {
+              const img = row.querySelector('.live-champ-img');
+              if (img) img.src = `https://ddragon.leagueoflegends.com/cdn/${patch}/img/champion/${pm.championId}.png`;
+              const cn = row.querySelector('.live-champ-name');
+              if (cn) cn.textContent = pm.championId;
+              const pn = row.querySelector('.live-player-name');
+              if (pn) pn.textContent = pm.summonerName;
+            }
+          }
+
+          const lvl = row.querySelector('.live-level');
+          if (lvl) lvl.textContent = player.level ?? 1;
+
+          // HP bar
+          const hpFill = row.querySelector('.live-hp-fill');
+          const hpText = row.querySelector('.live-hp-text');
+          if (hpFill && player.maxHealth > 0) {
+            const pct = Math.max(0, Math.min(100, (player.currentHealth / player.maxHealth) * 100));
+            hpFill.style.width = pct + '%';
+            hpFill.style.background = pct > 50 ? '#22c55e' : pct > 25 ? '#f59e0b' : '#ef4444';
+          }
+          if (hpText) hpText.textContent = `${player.currentHealth ?? 0}/${player.maxHealth ?? 0}`;
+
+          const k = row.querySelector('.live-kills');
+          const d = row.querySelector('.live-deaths');
+          const a = row.querySelector('.live-assists');
+          const cs = row.querySelector('.live-cs');
+          if (k) k.textContent = player.kills ?? 0;
+          if (d) d.textContent = player.deaths ?? 0;
+          if (a) a.textContent = player.assists ?? 0;
+          if (cs) cs.textContent = player.creepScore ?? 0;
+        }
+
+        const DRAGON_SVGS = {
+          infernal: `<svg width="18px" height="18px" viewBox="0 0 14 18" xmlns="http://www.w3.org/2000/svg"><path fill="#F26C23" d="M6.185725,0 C6.185725,0 6.68325,2.9099 6.23805,3.343375 C5.79285,3.77685 2.274125,7.10675 2.274125,7.10675 L1.1004,5.78095 L0,9.82625 C0,9.82625 1.6954,11.38935 2.48955,14.728 L7,17 L13.4652,12.0666 L14,9.041025 L12.7162,7.765625 C12.7162,7.765625 12.951225,9.4052 12.354825,9.4052 C11.75825,9.4052 10.6764,6.8957 9.88715,6.8957 C9.098075,6.8957 8.401575,7.10115 6.9097,7.4508 C5.718475,7.7301 5.26015,9.698675 5.12365,10.48075 C5.090225,10.6729 5.171425,10.8668 5.33435,10.97985 L6.9097,12.347825 C6.9097,12.347825 8.385125,11.378325 8.385125,10.723825 C8.385125,10.221575 7.146825,10.252025 7.146825,9.30265 C7.146825,8.75 7.6391,8.52985 8.262625,8.52985 C9.99355,8.52985 10.6708,10.5721 10.6708,10.5721 C9.404675,13.03785 6.9951,14.595 6.9951,14.595 C6.9951,14.595 3.436475,12.154625 3.436475,10.63195 C3.436475,6.427225 8.33595,5.31125 8.33595,5.31125 L8.98555,3.1598 L6.185725,0 Z"/></svg>`,
+          ocean:     `<svg width="18px" height="18px" viewBox="0 0 14 18" xmlns="http://www.w3.org/2000/svg"><path fill="#67C4B0" d="M14,11.272025 C14,9.952875 12.87125,9.44695 12.87125,9.44695 C12.87125,9.44695 13.38225,8.4323 13.38225,7.648825 C13.38225,4.919525 11.339125,2 7.911225,2 C3.984225,2 2.41325,6.1566 2.41325,6.1566 C2.41325,6.1566 1.932875,5.452575 2.08425,3.761025 C2.08425,3.761025 0,5.522225 0,9.19355 C0,12.138275 2.055375,15.65 5.7512,15.65 C8.239,15.65 9.910075,13.554725 9.910075,11.2869 C9.910075,9.141925 8.16095,7.872475 6.523125,7.872475 C5.453525,7.872475 4.567675,8.64755 4.567675,8.64755 C4.86745,7.1303 6.50195,6.52375 6.50195,6.52375 C7.092925,3.727425 10.506825,4.049425 10.506825,4.049425 C10.506825,4.049425 9.08005,4.797375 8.588475,6.1524 C8.588475,6.1524 12.0211,7.341525 12.0211,11.19765 C12.0211,13.94445 10.213875,15.407275 10.213875,15.407275 C10.213875,15.407275 11.930625,14.51145 13.0858,12.63615 C13.323975,12.94065 13.347075,13.3806 13.347075,13.3806 C13.347075,13.3806 14,12.591175 14,11.272025"/></svg>`,
+          mountain:  `<svg width="18px" height="18px" viewBox="0 0 14 18" xmlns="http://www.w3.org/2000/svg"><path fill="#A8805D" d="M3,4.5 L6,16 L5,17 L1,12.0302388 L1,7.07612197 L3,4.5 Z M6.50012207,13 L4.5,3 L6,1 L8,1 L9.5,3 L7.5,13 L6.50012207,13 Z M11,4.5 L13,7.07612197 L13,12.0302388 L9,17 L8,16 L11,4.5 Z"/></svg>`,
+          cloud:     `<svg width="18px" height="18px" viewBox="0 0 14 18" xmlns="http://www.w3.org/2000/svg"><path fill="#ADD2ED" d="M3.839325,1 C3.839325,1 8.2243,2.667575 8.2243,6.623975 C8.2243,10.4591 1.939175,10.2722 1.939175,14.969375 C1.939175,15.96705 2.63515,17.3401 2.63515,17.3401 C2.63515,17.3401 0,15.71505 0,13.447575 C0,9.575175 4.95565,11.117975 4.95565,4.486 C4.95565,2.01885 3.839325,1 3.839325,1 M12.4478333,8.7884625 C12.4478333,10.2183875 11.3421833,12.5586625 8.51803332,12.5586625 C4.30910832,12.5586625 3.72618332,14.4448125 3.72618332,14.4448125 C2.98505832,11.7594375 10.5375333,9.9887875 10.5375333,5.9735875 C10.5375333,4.1395875 9.63558332,3.1321125 9.63558332,3.1321125 C9.63558332,3.1321125 12.4478333,5.0774125 12.4478333,8.7884625 M4.55,15.75691 C5.138175,14.079535 6.3917,13.71641 6.3917,13.71641 C6.3917,13.71641 7.9394,14.238085 8.6177,14.238085 C11.88495,14.238085 13.846175,10.297785 13.846175,10.297785 C13.846175,10.297785 14.870975,13.87391 11.552275,17.450035 C11.552275,17.450035 9.60295,15.161035 7.14315,15.161035 C5.651975,15.161035 4.55,15.75691 4.55,15.75691"/></svg>`,
+          hextech:   `<svg width="18px" height="18px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill="#81D9F5" fill-rule="evenodd" clip-rule="evenodd" d="M13.4142 3V5.78423L20 12.2808L13.4142 18.7773L11.0572 21V19.2414L4 12.2808L11.0572 5.32019L13.4142 3ZM15.1231 10.1346L17 11.9822L12 16.9041L7.00003 11.9822L8.87694 10.1346L12 13.2089L15.1231 10.1346ZM14.0624 9.09049L12 11.1207L9.9376 9.09055L12 7.06034L14.0624 9.09049Z"/></svg>`,
+          chemtech:  `<svg width="18px" height="18px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill="#A4B72B" d="M15.8377 6.24546C16.8672 6.24546 17.2548 5.31013 16.7519 4.29806C19.0471 5.60353 21.6148 9.13739 19.0471 11.381C16.9304 13.2303 14.7314 12.2534 12.9652 10.2592C11.8045 8.94874 8.13507 8.00911 8.13507 10.739C8.13507 12.2439 9.19042 13.1114 10.6993 13.3874C10.2969 13.1114 9.51962 12.1294 10.2969 11.1793C11.2292 10.0399 13.2537 12.3425 14.7229 13.1114C16.456 14.0183 18.2637 12.9588 19.2522 13.1771C22.3776 13.8678 21.231 19.3125 16.456 18.6449C14.197 18.3291 12.8524 17.8037 11.9707 18.6449C10.8823 19.6832 13.3545 20.8856 14.2515 20.8856C12.3763 21.5236 7.06641 19.3849 9.41883 17.1584C10.0521 16.559 10.6749 16.3194 11.184 16.3316C11.184 17.5007 12.9846 17.2448 13.7648 16.9625C15.4769 16.3432 14.9583 14.428 13.3163 14.0183C11.2766 13.5096 10.1287 17.3467 5.56753 15.8745C3.83222 15.3145 3 13.9529 3 12.6649C3 11.3768 3.84781 10.592 4.25016 10.0399C3.9193 7.3383 4.8087 5.43267 6.15552 4.29806C8.00363 2.74117 11.9707 2.39384 13.2701 4.31965C13.6292 4.85177 14.4026 6.24546 15.8377 6.24546Z"/></svg>`,
+          elder:     `<svg width="18px" height="18px" viewBox="0 0 14 18" xmlns="http://www.w3.org/2000/svg"><path fill="#C9BCDC" d="M9.282525,10.64335 C8.611225,11.44178 8.069075,11.3129 8.069075,11.3129 L8.5337,10.192725 L9.721425,9.252625 C9.721425,9.252625 9.953825,9.845 9.282525,10.64335 M7.843325,16.17685 C7.843325,16.17685 7.503475,15.613875 7.33355,15.332475 L6.999825,15.84645 L6.6661,15.332475 C6.496175,15.613875 6.156325,16.17685 6.156325,16.17685 C6.156325,16.17685 5.438825,15.278575 5.438825,14.298925 C5.438825,13.31945 5.6182,12.50605 5.6182,12.50605 L6.107325,13.987425 L6.49425,13.6978 C6.49425,13.6978 6.605025,14.05165 6.999825,14.5693 C7.39445,14.05165 7.505225,13.6978 7.505225,13.6978 L7.892325,13.987425 L8.381275,12.50605 C8.381275,12.50605 8.560825,13.31945 8.560825,14.298925 C8.560825,15.278575 7.843325,16.17685 7.843325,16.17685 M4.149775,9.252625 L5.424125,10.192725 L5.922875,11.4956 C5.922875,11.4956 4.149775,11.213325 4.149775,9.252625 M9.493575,-0.0005 L9.02265,0.513475 L9.194325,4.331625 C9.194325,4.331625 10.231725,5.096725 10.231725,6.0405 C10.231725,6.730525 9.767975,7.222975 9.276225,7.222975 C8.56765,7.222975 8.02585,6.47275 8.29395,5.55505 L7.000175,3.375775 L6.999825,3.375775 L5.705875,5.55505 C5.973975,6.47275 5.432175,7.222975 4.723775,7.222975 C4.232025,7.222975 3.768275,6.730525 3.768275,6.0405 C3.768275,5.096725 4.8055,4.331625 4.8055,4.331625 L4.977175,0.513475 L4.50625,-0.0005 C4.50625,3.448925 0,6.669975 0,10.24505 C0,12.510425 2.260475,13.944725 2.260475,16.217625 C2.260475,16.217625 2.6649,15.643625 2.6649,14.24555 C2.6649,12.8473 2.1504,12.74125 2.1504,11.87395 C2.1504,11.006825 2.927225,10.17225 2.927225,10.17225 C2.927225,11.666925 4.60985,12.917825 4.60985,13.628675 C4.60985,14.612525 5.48485,17.4995 7,17.4995 C8.514975,17.4995 9.39015,14.612525 9.39015,13.628675 C9.39015,12.917825 11.0726,11.666925 11.0726,10.17225 C11.0726,10.17225 11.849425,11.006825 11.849425,11.87395 C11.849425,12.74125 11.334925,12.8473 11.334925,14.24555 C11.334925,15.643625 11.73935,16.217625 11.73935,16.217625 C11.73935,13.944725 14,12.510425 14,10.24505 C14,6.669975 9.493575,3.448925 9.493575,-0.0005"/></svg>`,
+        };
+
+        function dragonSVG(type) {
+          return DRAGON_SVGS[type] || DRAGON_SVGS['mountain'];
+        }
+
+        function updateDragons(blueTeam, redTeam) {
+          const blueEl = document.getElementById('blue-dragons');
+          const redEl  = document.getElementById('red-dragons');
+          if (blueEl) blueEl.innerHTML = (blueTeam.dragons || []).map(d => dragonSVG(d)).join('');
+          if (redEl)  redEl.innerHTML  = (redTeam.dragons  || []).map(d => dragonSVG(d)).join('');
+        }
+
+        function updatePlayerGold(row, totalGold, opponentGold) {
+          if (!row) return;
+          const goldEl = row.querySelector('.live-gold');
+          const diffEl = row.querySelector('.live-gold-diff');
+          if (goldEl && totalGold != null) {
+            goldEl.textContent = Number(totalGold).toLocaleString('en-us');
+          }
+          if (diffEl && totalGold != null && opponentGold != null) {
+            const diff = totalGold - opponentGold;
+            const positive = diff >= 0;
+            diffEl.textContent = (positive ? '+' : '') + Number(diff).toLocaleString('en-us');
+            diffEl.style.color = positive ? '#16a34a' : '#dc2626';
+          }
+        }
+
+        function updateScoreboard(data) {
+          if (!data?.frames?.length) return;
+          const frame = data.frames[data.frames.length - 1];
+
+          if (data.gameMetadata) {
+            metadata = data.gameMetadata;
+            if (data.gameMetadata.patchVersion) {
+              const parts = data.gameMetadata.patchVersion.split('.');
+              if (parts.length >= 2) window._lolPatch = `${parts[0]}.${parts[1]}.1`;
+            }
+          }
+
+          // Game time
+          const timeEl = document.getElementById('live-game-time');
+          if (timeEl && frame.gameTime != null) {
+            const m = Math.floor(frame.gameTime / 60000);
+            const s = Math.floor((frame.gameTime % 60000) / 1000);
+            timeEl.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+          }
+
+          const blue = frame.blueTeam;
+          const red = frame.redTeam;
+          if (!blue || !red) return;
+
+          // Header stats
+          const el = id => document.getElementById(id);
+          if (el('live-blue-towers')) el('live-blue-towers').textContent = blue.towers ?? 0;
+          if (el('live-red-towers')) el('live-red-towers').textContent = red.towers ?? 0;
+          if (el('live-blue-kills')) el('live-blue-kills').textContent = blue.totalKills ?? 0;
+          if (el('live-red-kills')) el('live-red-kills').textContent = red.totalKills ?? 0;
+          if (el('live-blue-gold')) el('live-blue-gold').textContent = blue.totalGold ? Number(blue.totalGold).toLocaleString('en-us') : '—';
+          if (el('live-red-gold')) el('live-red-gold').textContent = red.totalGold ? Number(red.totalGold).toLocaleString('en-us') : '—';
+          if (el('live-blue-barons')) el('live-blue-barons').textContent = blue.barons ?? 0;
+          if (el('live-red-barons')) el('live-red-barons').textContent = red.barons ?? 0;
+          if (el('live-blue-inhibitors')) el('live-blue-inhibitors').textContent = blue.inhibitors ?? 0;
+          if (el('live-red-inhibitors')) el('live-red-inhibitors').textContent = red.inhibitors ?? 0;
+          updateDragons(blue, red);
+
+          // Gold bar
+          const totalGold = (blue.totalGold || 0) + (red.totalGold || 0);
+          if (totalGold > 0) {
+            const bluePct = ((blue.totalGold / totalGold) * 100).toFixed(1);
+            const redPct = (100 - bluePct).toFixed(1);
+            if (el('live-gold-bar-blue')) el('live-gold-bar-blue').style.width = bluePct + '%';
+            if (el('live-gold-bar-red')) el('live-gold-bar-red').style.width = redPct + '%';
+            if (el('live-blue-gold-total')) el('live-blue-gold-total').textContent = `${(blue.totalGold/1000).toFixed(1)}k`;
+            if (el('live-red-gold-total')) el('live-red-gold-total').textContent = `${(red.totalGold/1000).toFixed(1)}k`;
+          }
+
+          // Objectives sidebar
+          if (el('live-obj-blue-baron')) el('live-obj-blue-baron').textContent = blue.barons ?? 0;
+          if (el('live-obj-red-baron')) el('live-obj-red-baron').textContent = red.barons ?? 0;
+          if (el('live-obj-blue-tower')) el('live-obj-blue-tower').textContent = blue.towers ?? 0;
+          if (el('live-obj-red-tower')) el('live-obj-red-tower').textContent = red.towers ?? 0;
+          if (el('live-obj-blue-inhibitor')) el('live-obj-blue-inhibitor').textContent = blue.inhibitors ?? 0;
+          if (el('live-obj-red-inhibitor')) el('live-obj-red-inhibitor').textContent = red.inhibitors ?? 0;
+          const blueDragons = blue.dragons?.length ?? 0;
+          const redDragons = red.dragons?.length ?? 0;
+          if (el('live-obj-blue-dragon')) el('live-obj-blue-dragon').textContent = blueDragons;
+          if (el('live-obj-red-dragon')) el('live-obj-red-dragon').textContent = redDragons;
+
+          // Player rows + gold diff (compare each player vs their lane opponent)
+          (blue.participants || []).forEach(p => {
+            updatePlayerRow(getRow(p.participantId), p);
+            const opponent = (red.participants || []).find(r => r.participantId === p.participantId + 5);
+            updatePlayerGold(getRow(p.participantId), p.totalGold, opponent?.totalGold);
+          });
+          (red.participants || []).forEach(p => {
+            updatePlayerRow(getRow(p.participantId), p);
+            const opponent = (blue.participants || []).find(b => b.participantId === p.participantId - 5);
+            updatePlayerGold(getRow(p.participantId), p.totalGold, opponent?.totalGold);
+          });
+        }
+
+        function updateDetails(data) {
+          if (!data?.frames?.length) return;
+          const frame = data.frames[data.frames.length - 1];
+          const patch = window._lolPatch || PATCH_VERSION;
+          // Details API returns a flat participants array (indices 0-9), NOT split by team
+          const all = frame.participants || [];
+          all.forEach((dp, index) => {
+            const pid = index + 1; // participants are 0-indexed, rows are 1-indexed
+            const row = getRow(pid);
+            if (!row || !dp.items) return;
+            const itemsEl = row.querySelector('.live-items');
+            if (itemsEl) {
+              itemsEl.innerHTML = dp.items.map(id =>
+                id > 0
+                  ? `<img src="https://ddragon.leagueoflegends.com/cdn/${patch}/img/item/${id}.png" style="width:22px;height:22px;border-radius:3px;" onerror="this.style.display='none'">`
+                  : `<div style="width:22px;height:22px;background:#e5e7eb;border-radius:3px;"></div>`
+              ).join('');
+            }
+          });
+        }
+
+        let secondDelay = 600;
+        let pollCount = 0;
+        let delayFailureCount = 0;
+        let delayLocked = false; // true once we've hit a 400 and found the floor
+
+        function getLiveTimestamp() {
+          const d = new Date();
+          d.setMilliseconds(0);
+          d.setSeconds(d.getSeconds() - (d.getSeconds() % 10));
+          d.setSeconds(d.getSeconds() - secondDelay);
+          return d.toISOString();
+        }
+
+        function setWinLoss(blueWon) {
+          const blueBadge = document.getElementById('blue-outcome-badge');
+          const redBadge  = document.getElementById('red-outcome-badge');
+          if (!blueBadge || !redBadge) return;
+          if (blueWon) {
+            blueBadge.textContent = '🏆 WIN';
+            blueBadge.style.background = '#dcfce7';
+            blueBadge.style.color = '#16a34a';
+            blueBadge.style.display = 'block';
+            redBadge.textContent = 'LOSS';
+            redBadge.style.background = '#fee2e2';
+            redBadge.style.color = '#dc2626';
+            redBadge.style.display = 'block';
+          } else {
+            redBadge.textContent = '🏆 WIN';
+            redBadge.style.background = '#dcfce7';
+            redBadge.style.color = '#16a34a';
+            redBadge.style.display = 'block';
+            blueBadge.textContent = 'LOSS';
+            blueBadge.style.background = '#fee2e2';
+            blueBadge.style.color = '#dc2626';
+            blueBadge.style.display = 'block';
+          }
+        }
+
+        const GAME_STATE = "<%= game&.dig("state") %>";
+        const GAME_PLAYERS = <%= raw({
+          blue: (game_blue&.dig("players") || []).map { |p|
+            { participantId: p["participantId"], summonerName: p["summonerName"] || p["name"],
+              championId: p["championId"], kills: p["kills"], deaths: p["deaths"],
+              assists: p["assists"], creepScore: p["creepScore"] }
+          },
+          red: (game_red&.dig("players") || []).map { |p|
+            { participantId: p["participantId"], summonerName: p["summonerName"] || p["name"],
+              championId: p["championId"], kills: p["kills"], deaths: p["deaths"],
+              assists: p["assists"], creepScore: p["creepScore"] }
+          }
+        }.to_json) %>;
+
+        function loadCompletedGameFromEventDetails() {
+          const patch = window._lolPatch || PATCH_VERSION;
+          [...GAME_PLAYERS.blue, ...GAME_PLAYERS.red].forEach((p, i) => {
+            const pid = i + 1; // blue = 1-5, red = 6-10
+            const row = getRow(pid);
+            if (!row) return;
+
+            // Champion image
+            if (p.championId) {
+              const img = row.querySelector('.live-champ-img');
+              if (img) img.src = `https://ddragon.leagueoflegends.com/cdn/${patch}/img/champion/${p.championId}.png`;
+              const cn = row.querySelector('.live-champ-name');
+              if (cn) cn.textContent = p.championId;
+            }
+
+            // Player name
+            if (p.summonerName) {
+              const pn = row.querySelector('.live-player-name');
+              if (pn) pn.textContent = p.summonerName;
+            }
+
+            // KDA / CS
+            const k = row.querySelector('.live-kills');
+            const d = row.querySelector('.live-deaths');
+            const a = row.querySelector('.live-assists');
+            const cs = row.querySelector('.live-cs');
+            if (k) k.textContent = p.kills ?? '—';
+            if (d) d.textContent = p.deaths ?? '—';
+            if (a) a.textContent = p.assists ?? '—';
+            if (cs) cs.textContent = p.creepScore ?? '—';
+          });
+        }
+
+        const LIVE_API = `https://feed.lolesports.com/livestats/v1`;
+
+        async function loadCompletedGame() {
+          try {
+            const wr = await fetch(`${LIVE_API}/window/${GAME_ID}`);
+            if (wr.ok) {
+              const d = await wr.json();
+              if (d.gameMetadata) {
+                metadata = d.gameMetadata;
+                const parts = d.gameMetadata.patchVersion?.split('.');
+                if (parts?.length >= 2) window._lolPatch = `${parts[0]}.${parts[1]}.1`;
+                loadCompletedGameFromEventDetails();
+              }
+              if (d.frames?.length) updateScoreboard(d);
+              await tryFindEndOfGameFrame();
+            }
+          } catch(e) { console.warn('Load error:', e); }
+        }
+
+        function makeTS(offsetSeconds) {
+          const d = new Date();
+          d.setMilliseconds(0);
+          d.setSeconds(d.getSeconds() - (d.getSeconds() % 10));
+          d.setSeconds(d.getSeconds() - offsetSeconds);
+          return encodeURIComponent(d.toISOString());
+        }
+
+        async function tryFindEndOfGameFrame() {
+          // Scan oldest→newest so the LAST hit is the end-of-game frame with full items
+          const offsets = [43200, 21600, 14400, 7200, 3600, 1800, 1200, 900, 720, 600, 480, 360, 240, 180, 120, 60];
+          let bestWindowData = null;
+          let bestTS = null;
+
+          for (const offset of offsets) {
+            try {
+              const ts = makeTS(offset);
+              const wr = await fetch(`${LIVE_API}/window/${GAME_ID}?startingTime=${ts}`);
+              if (!wr.ok) continue;
+              const data = await wr.json();
+              const frame = data.frames?.[data.frames.length - 1];
+              if (frame && (frame.blueTeam?.totalKills > 0 || frame.blueTeam?.towers > 0 || frame.blueTeam?.totalGold > 10000)) {
+                bestWindowData = data;
+                bestTS = ts;
+              }
+            } catch(e) { /* keep trying */ }
+          }
+
+          if (!bestWindowData) return;
+
+          updateScoreboard(bestWindowData);
+
+          // Determine winner
+          const frame = bestWindowData.frames[bestWindowData.frames.length - 1];
+          const blueInhibs = frame.blueTeam?.inhibitors ?? 0;
+          const redInhibs  = frame.redTeam?.inhibitors ?? 0;
+          if (blueInhibs !== redInhibs) {
+            setWinLoss(blueInhibs > redInhibs);
+          } else if (bestWindowData.frames.some(f => f.gameState === 'finished')) {
+            const blueKills = frame.blueTeam?.totalKills ?? 0;
+            const redKills  = frame.redTeam?.totalKills ?? 0;
+            if (blueKills !== redKills) setWinLoss(blueKills > redKills);
+          }
+
+          // Fetch details at same timestamp — also try ±10s offsets if items are empty
+          const detailOffsets = [0, -10, 10, -20, 20, -30, 30, -60, 60];
+          for (const delta of detailOffsets) {
+            try {
+              const baseOffset = parseInt(decodeURIComponent(bestTS).slice(-10)) || 0;
+              const d = new Date();
+              d.setMilliseconds(0);
+              d.setSeconds(d.getSeconds() - (d.getSeconds() % 10));
+              const ts2 = encodeURIComponent(new Date(new Date(decodeURIComponent(bestTS)).getTime() + delta * 1000).toISOString());
+              const dr = await fetch(`${LIVE_API}/details/${GAME_ID}?startingTime=${ts2}`);
+              if (!dr.ok) continue;
+              const dd = await dr.json();
+              // Check if any participant actually has items
+              const lastDFrame = dd.frames?.[dd.frames.length - 1];
+              const allParts = [...(lastDFrame?.blueTeam?.participants || []), ...(lastDFrame?.redTeam?.participants || [])];
+              const hasItems = allParts.some(p => p.items?.some(id => id > 0));
+              if (hasItems) {
+                updateDetails(dd);
+                return;
+              }
+            } catch(e) { /* keep trying */ }
+          }
+        }
+
+        let consecutiveFailures = 0;
+
+        async function poll() {
+          try {
+            const ts = encodeURIComponent(getLiveTimestamp());
+            const wr = await fetch(`${LIVE_API}/window/${GAME_ID}?startingTime=${ts}`);
+
+            if (wr.status === 400) {
+              // We've hit the floor — back up a bit and lock the delay here
+              if (!delayLocked) {
+                secondDelay += 20;
+                delayLocked = true;
+                console.log(`Delay floor found, locked at ${secondDelay}s`);
+              } else {
+                // Already locked but still failing — back off slowly
+                delayFailureCount++;
+                if (delayFailureCount >= 6) {
+                  secondDelay += 10;
+                  delayFailureCount = 0;
+                  console.log(`Delay backed off to ${secondDelay}s`);
+                }
+              }
+              const errBody = await wr.json().catch(() => ({}));
+              const errMsg = errBody?.message || '';
+              if (!errMsg.includes('window with end time less than')) {
+                consecutiveFailures++;
+              } else {
+                consecutiveFailures = 0;
+              }
+              if (consecutiveFailures >= 3) {
+                // Game just ended — stop polling, update UI, load final state
+                clearInterval(window._livePolling);
+                window._livePolling = null;
+
+                // Flip header from LIVE to Final
+                const timeEl = document.getElementById('live-game-time');
+                if (timeEl) { timeEl.textContent = 'Final'; timeEl.style.color = '#6b7280'; }
+                const statusEl = document.getElementById('game-status-label');
+                if (statusEl) statusEl.textContent = 'Final';
+
+                // Fetch updated event details to get winner
+                try {
+                  const evRes = await fetch(`/matches/<%= @event_id %>`, { headers: { 'Accept': 'application/json' } });
+                } catch(e) {}
+
+                loadCompletedGameFromEventDetails();
+                await tryFindEndOfGameFrame(); // also calls setWinLoss via inhibitor data
+
+                // Reload after 15s to get fresh outcome data from esports API
+                setTimeout(() => window.location.reload(), 15000);
+              }
+              return;
+            }
+
+            consecutiveFailures = 0;
+            delayFailureCount = 0;
+            if (!delayLocked) {
+              // Aggressively catch up to real-time — reduce by 30s every 2 polls
+              if (++pollCount % 2 === 0) {
+                secondDelay = Math.max(130, secondDelay - 30);
+                console.log(`Delay reduced to ${secondDelay}s`);
+              }
+              // Show catching up banner with how far behind we are
+              const banner = document.getElementById('catchup-banner');
+              const catchupText = document.getElementById('catchup-text');
+              if (banner) banner.style.display = 'block';
+              if (catchupText) catchupText.textContent = `Catching up to live... (~${Math.round((secondDelay - 130) / 60)}m behind)`;
+            } else {
+              // Locked near the floor — hide banner, we're live
+              const banner = document.getElementById('catchup-banner');
+              if (banner) banner.style.display = 'none';
+              // Nudge down slowly every 20 polls
+              if (++pollCount % 20 === 0) {
+                secondDelay = Math.max(130, secondDelay - 10);
+                delayLocked = secondDelay > 130;
+              }
+            }
+            if (wr.ok) {
+              const d = await wr.json();
+              updateScoreboard(d);
+            }
+
+            const dr = await fetch(`${LIVE_API}/details/${GAME_ID}?startingTime=${ts}`);
+            if (dr.ok) { const d = await dr.json(); updateDetails(d); }
+          } catch(e) { console.warn('Poll error:', e); }
+        }
+
+        // Series-level fallback for deciding game WIN/LOSS (from ERB data)
+        const BLUE_SERIES_WINS = <%= blue_team&.dig("result", "gameWins").to_i %>;
+        const RED_SERIES_WINS  = <%= red_team&.dig("result", "gameWins").to_i %>;
+        const SERIES_MAX       = <%= @match&.dig("strategy", "count").to_i %>;
+        const WINS_NEEDED      = Math.ceil(SERIES_MAX / 2);
+        const SERIES_OVER      = BLUE_SERIES_WINS >= WINS_NEEDED || RED_SERIES_WINS >= WINS_NEEDED;
+        const SELECTED_INDEX   = <%= selected_index %>;
+        const LAST_GAME_INDEX  = <%= @games.rindex { |g| g["state"] == "completed" } || -1 %>;
+
+        if (GAME_STATE === 'completed') {
+          loadCompletedGameFromEventDetails();
+          if (SERIES_OVER && SELECTED_INDEX === LAST_GAME_INDEX && BLUE_SERIES_WINS !== RED_SERIES_WINS) {
+            setWinLoss(BLUE_SERIES_WINS > RED_SERIES_WINS);
+          }
+          loadCompletedGame();
+        } else {
+          // Show catching up banner immediately
+          const banner = document.getElementById('catchup-banner');
+          const catchupText = document.getElementById('catchup-text');
+          if (banner) banner.style.display = 'block';
+          if (catchupText) catchupText.textContent = `Catching up to live... (~${Math.round((secondDelay - 130) / 60)}m behind)`;
+
+          // Immediately fetch metadata (no startingTime) so champion names/images
+          // appear right away without waiting for the first delayed poll
+          fetch(`${LIVE_API}/window/${GAME_ID}`).then(r => r.ok ? r.json() : null).then(d => {
+            if (d) updateScoreboard(d);
+          }).catch(() => {});
+
+          poll();
+          window._livePolling = setInterval(poll, 500);
+        }
+      })();
+    </script>
+  <% end %>
+<% end %>

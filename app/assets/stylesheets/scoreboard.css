@@ -1,0 +1,320 @@
+/* Nav dropdowns */
+.nav-dropdown-group:hover .nav-dropdown-menu {
+  display: block;
+}
+
+.nav-dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  min-width: 100px;
+  z-index: 100;
+  padding: 4px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.nav-dropdown-menu a {
+  display: block;
+  padding: 7px 16px;
+  font-size: 13px;
+  color: #d1d5db;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav-dropdown-menu a:hover {
+  background: #2d2d2d;
+  color: white;
+}
+
+/* Scoreboard Card — ported from lolespn */
+
+.page {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  background: #f5f5f5;
+  font-family: Arial, sans-serif;
+  min-height: calc(100vh - 48px);
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.sidebar.left {
+  flex: 0 0 220px;
+}
+
+.sidebar.right {
+  flex: 0 0 300px;
+}
+
+.content {
+  flex: 1;
+  max-width: 660px;
+  margin: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  padding: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.scoreboard {
+  min-height: 250px;
+}
+
+.scoreboard-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px dotted #ccc;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+
+.scoreboard-logo {
+  height: 40px;
+  width: 40px;
+}
+
+.scoreboard-header h2 {
+  font-size: 18px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.games-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding-top: 10px;
+  position: relative;
+}
+
+.games-grid::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: #ddd;
+}
+
+.game-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #d1d5db;
+  padding: 12px 0;
+  min-height: 100px;
+  box-sizing: border-box;
+}
+
+.game-card:hover {
+  background: #f5f5f5;
+}
+
+.teams {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.team img {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  overflow: hidden;
+}
+
+.team span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.winner {
+  font-weight: bold;
+  color: #000;
+}
+
+.status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  min-width: 70px;
+}
+
+.status-league {
+  font-size: 11px;
+  color: #888;
+  width: 80px;
+  text-align: right;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
+.team-score {
+  margin-left: auto;
+  font-weight: bold;
+  font-size: 14px;
+  padding-left: 8px;
+  flex-shrink: 0;
+}
+
+.highlight-btn {
+  padding: 4px 10px;
+  border: 1px solid #1a73e8;
+  border-radius: 20px;
+  background: #fff;
+  color: #1a73e8;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.highlight-btn:hover {
+  background: #e8f0fe;
+}
+
+.date-selector {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 20px;
+  background: white;
+  border-radius: 6px;
+  overflow: hidden;
+  border-top: 1px dotted #ddd;
+}
+
+.date-item {
+  flex: 1;
+  padding: 10px 0;
+  text-align: center;
+  color: black;
+  cursor: pointer;
+  border-right: 1px solid #ddd;
+  transition: background 0.2s ease;
+}
+
+.date-item:last-child {
+  border-right: none;
+}
+
+.date-item:hover {
+  background: #ccc;
+}
+
+.date-number {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.date-weekday {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.date-item.selected {
+  background: #f5f5f5;
+  border-top: 2px solid red;
+  color: black;
+}
+
+.today-label {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  color: black;
+}
+
+/* ── Mobile ── */
+@media (max-width: 768px) {
+  .page {
+    flex-direction: column;
+    padding: 10px;
+  }
+
+  /* Hide sidebars on mobile */
+  .sidebar {
+    display: none;
+  }
+
+  .content {
+    margin: 0;
+    max-width: 100%;
+  }
+
+  /* Single column games grid */
+  .games-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  /* Remove the vertical center divider */
+  .games-grid::before {
+    display: none;
+  }
+
+  .game-card {
+    padding: 10px 0;
+  }
+
+  /* Smaller team name text so it doesn't overflow */
+  .team span:not(.score) {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+  }
+
+  .date-number {
+    font-size: 14px;
+  }
+
+  .date-weekday {
+    font-size: 10px;
+  }
+
+  .today-label {
+    font-size: 10px;
+  }
+
+  .date-item {
+    padding: 8px 0;
+  }
+
+  .card {
+    border-radius: 8px;
+    padding: 14px;
+  }
+
+  .scoreboard-header h2 {
+    font-size: 15px;
+  }
+}
