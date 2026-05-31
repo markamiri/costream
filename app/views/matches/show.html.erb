@@ -78,12 +78,12 @@
         </div>
 
         <!-- Center Status -->
-        <div class="mh-score" style="display:flex; flex-direction:column; align-items:center; gap:2px; min-width:80px;">
-          <span id="game-status-label" class="mh-score-label" style="font-size:10px; text-transform:uppercase; color:#9ca3af; font-weight:400;">
-            <%= game&.dig("state") == "completed" ? "Final" : "Live" %>
-          </span>
-          <div id="live-game-time" class="mh-score-time" style="font-size:13px; font-weight:bold; color:<%= game&.dig("state") == "completed" ? '#6b7280' : '#ef4444' %>;">
-            <%= game&.dig("state") == "completed" ? "Final" : "⬤ LIVE" %>
+        <div class="mh-score" style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:100px;">
+          <div id="live-game-state" style="font-size:11px; font-weight:700; padding:2px 8px; border-radius:4px; background:<%= game&.dig("state") == "completed" ? '#f3f4f6' : '#dcfce7' %>; color:<%= game&.dig("state") == "completed" ? '#6b7280' : '#16a34a' %>;">
+            <%= game&.dig("state") == "completed" ? "GAME ENDED" : "IN GAME" %>
+          </div>
+          <div id="live-game-time" class="mh-score-label" style="font-size:13px; font-weight:bold; color:<%= game&.dig("state") == "completed" ? '#6b7280' : '#111' %>;">
+            <%= game&.dig("state") == "completed" ? "Final" : "00:00" %>
           </div>
           <div style="font-size:18px; font-weight:bold; color:#111;">
             <%= blue_team&.dig("result", "gameWins") || 0 %> – <%= red_team&.dig("result", "gameWins") || 0 %>
@@ -426,12 +426,26 @@
             }
           }
 
+          // Game state label
+          const stateEl = document.getElementById('live-game-state');
+          if (stateEl && frame.gameState) {
+            const stateMap = { in_game: 'IN GAME', paused: 'GAME PAUSED', finished: 'GAME ENDED' };
+            const colorMap = { in_game: ['#dcfce7','#16a34a'], paused: ['#fef9c3','#ca8a04'], finished: ['#f3f4f6','#6b7280'] };
+            const label = stateMap[frame.gameState] || frame.gameState.toUpperCase();
+            const [bg, color] = colorMap[frame.gameState] || ['#f3f4f6','#6b7280'];
+            stateEl.textContent = label;
+            stateEl.style.background = bg;
+            stateEl.style.color = color;
+          }
+
           // Game time
           const timeEl = document.getElementById('live-game-time');
           if (timeEl && frame.gameTime != null) {
             const m = Math.floor(frame.gameTime / 60000);
             const s = Math.floor((frame.gameTime % 60000) / 1000);
-            timeEl.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            const timeStr = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+            timeEl.textContent = timeStr;
+            console.log(`[game time] ${timeStr} | state: ${frame.gameState} | frameTs: ${frame.rfc460Timestamp}`);
           }
 
           const blue = frame.blueTeam;
@@ -507,19 +521,6 @@
               ).join('');
             }
           });
-        }
-
-        let secondDelay = 600;
-        let pollCount = 0;
-        let delayFailureCount = 0;
-        let delayLocked = false; // true once we've hit a 400 and found the floor
-
-        function getLiveTimestamp() {
-          const d = new Date();
-          d.setMilliseconds(0);
-          d.setSeconds(d.getSeconds() - (d.getSeconds() % 10));
-          d.setSeconds(d.getSeconds() - secondDelay);
-          return d.toISOString();
         }
 
         function setWinLoss(blueWon) {
@@ -681,90 +682,92 @@
           }
         }
 
-        let consecutiveFailures = 0;
+        // Aureom-style adaptive delay
+        let secondDelay = 60;
+        let delayCount = 0;
+        let delayFailureCount = 0;
+        let lastFrameSuccess = false;
+        let currentTimestamp = '';
+        let firstFrameTimestamp = '';
+
+        function getISODateMultiplyOf10() {
+          const d = new Date();
+          d.setMilliseconds(0);
+          if (d.getSeconds() % 10 !== 0) {
+            d.setSeconds(d.getSeconds() - (d.getSeconds() % 10));
+          }
+          d.setSeconds(d.getSeconds() - secondDelay);
+          return d.toISOString();
+        }
+
+        function formatGameTime(startTs, currentTs) {
+          const seconds = Math.floor((new Date(currentTs) - new Date(startTs)) / 1000);
+          const m = Math.floor(seconds / 60);
+          const s = seconds % 60;
+          return `${m}:${s < 10 ? '0' + s : s}`;
+        }
 
         async function poll() {
           try {
-            const ts = encodeURIComponent(getLiveTimestamp());
+            const ts = encodeURIComponent(getISODateMultiplyOf10());
+
+            // Window request — same as Aureom's getLiveWindow
             const wr = await fetch(`${LIVE_API}/window/${GAME_ID}?startingTime=${ts}`);
-
-            if (wr.status === 400) {
-              // We've hit the floor — back up a bit and lock the delay here
-              if (!delayLocked) {
-                secondDelay += 20;
-                delayLocked = true;
-                console.log(`Delay floor found, locked at ${secondDelay}s`);
-              } else {
-                // Already locked but still failing — back off slowly
-                delayFailureCount++;
-                if (delayFailureCount >= 6) {
-                  secondDelay += 10;
-                  delayFailureCount = 0;
-                  console.log(`Delay backed off to ${secondDelay}s`);
-                }
-              }
-              const errBody = await wr.json().catch(() => ({}));
-              const errMsg = errBody?.message || '';
-              if (!errMsg.includes('window with end time less than')) {
-                consecutiveFailures++;
-              } else {
-                consecutiveFailures = 0;
-              }
-              if (consecutiveFailures >= 3) {
-                // Game just ended — stop polling, update UI, load final state
-                clearInterval(window._livePolling);
-                window._livePolling = null;
-
-                // Flip header from LIVE to Final
-                const timeEl = document.getElementById('live-game-time');
-                if (timeEl) { timeEl.textContent = 'Final'; timeEl.style.color = '#6b7280'; }
-                const statusEl = document.getElementById('game-status-label');
-                if (statusEl) statusEl.textContent = 'Final';
-
-                // Fetch updated event details to get winner
-                try {
-                  const evRes = await fetch(`/matches/<%= @event_id %>`, { headers: { 'Accept': 'application/json' } });
-                } catch(e) {}
-
-                loadCompletedGameFromEventDetails();
-                await tryFindEndOfGameFrame(); // also calls setWinLoss via inhibitor data
-
-                // Reload after 15s to get fresh outcome data from esports API
-                setTimeout(() => window.location.reload(), 15000);
-              }
-              return;
-            }
-
-            consecutiveFailures = 0;
-            delayFailureCount = 0;
-            if (!delayLocked) {
-              // Aggressively catch up to real-time — reduce by 30s every 2 polls
-              if (++pollCount % 2 === 0) {
-                secondDelay = Math.max(130, secondDelay - 30);
-                console.log(`Delay reduced to ${secondDelay}s`);
-              }
-              // Show catching up banner with how far behind we are
-              const banner = document.getElementById('catchup-banner');
-              const catchupText = document.getElementById('catchup-text');
-              if (banner) banner.style.display = 'block';
-              if (catchupText) catchupText.textContent = `Catching up to live... (~${Math.round((secondDelay - 130) / 60)}m behind)`;
-            } else {
-              // Locked near the floor — hide banner, we're live
-              const banner = document.getElementById('catchup-banner');
-              if (banner) banner.style.display = 'none';
-              // Nudge down slowly every 20 polls
-              if (++pollCount % 20 === 0) {
-                secondDelay = Math.max(130, secondDelay - 10);
-                delayLocked = secondDelay > 130;
-              }
-            }
             if (wr.ok) {
               const d = await wr.json();
-              updateScoreboard(d);
+              const lastFrame = d.frames?.[d.frames.length - 1];
+              const frameTs = lastFrame?.rfc460Timestamp || '';
+              if (!currentTimestamp || frameTs > currentTimestamp) {
+                currentTimestamp = frameTs;
+                updateScoreboard(d);
+                if (firstFrameTimestamp && frameTs) {
+                  const timeEl = document.getElementById('live-game-time');
+                  if (timeEl) timeEl.textContent = formatGameTime(firstFrameTimestamp, frameTs);
+                }
+                // Hide catchup banner once we have live data
+                const banner = document.getElementById('catchup-banner');
+                if (banner) banner.style.display = 'none';
+              }
+            } else if (wr.status === 400) {
+              const errBody = await wr.json().catch(() => ({}));
+              console.log(`[poll] 400: ${errBody?.message}`);
+            }
+
+            // Details request — Aureom's getGameDetailsResponse adaptive logic
+            if (delayCount++ % 10 === 0) {
+              delayFailureCount = 0;
+              secondDelay -= 10;
+            }
+            if (lastFrameSuccess) {
+              delayFailureCount = 0;
+            } else {
+              delayFailureCount++;
             }
 
             const dr = await fetch(`${LIVE_API}/details/${GAME_ID}?startingTime=${ts}`);
-            if (dr.ok) { const d = await dr.json(); updateDetails(d); }
+            if (dr.ok) {
+              const dd = await dr.json();
+              updateDetails(dd);
+              lastFrameSuccess = true;
+            } else if (dr.status === 400) {
+              lastFrameSuccess = false;
+              const errBody = await dr.json().catch(() => ({}));
+              const errMsg = errBody?.message || '';
+              if (errMsg.includes('window with end time less than') && delayFailureCount >= 6) {
+                delayCount = 1;
+                delayFailureCount = 0;
+                secondDelay += 10;
+                console.log(`[delay] backed off to ${secondDelay}s`);
+              }
+            }
+
+            // Show catchup banner while delay is large
+            if (secondDelay > 130) {
+              const banner = document.getElementById('catchup-banner');
+              const catchupText = document.getElementById('catchup-text');
+              if (banner) banner.style.display = 'block';
+              if (catchupText) catchupText.textContent = `Catching up to live... (~${Math.round((secondDelay - 60) / 60)}m behind)`;
+            }
           } catch(e) { console.warn('Poll error:', e); }
         }
 
@@ -788,12 +791,15 @@
           const banner = document.getElementById('catchup-banner');
           const catchupText = document.getElementById('catchup-text');
           if (banner) banner.style.display = 'block';
-          if (catchupText) catchupText.textContent = `Catching up to live... (~${Math.round((secondDelay - 130) / 60)}m behind)`;
+          if (catchupText) catchupText.textContent = `Catching up to live...`;
 
           // Immediately fetch metadata (no startingTime) so champion names/images
           // appear right away without waiting for the first delayed poll
           fetch(`${LIVE_API}/window/${GAME_ID}`).then(r => r.ok ? r.json() : null).then(d => {
-            if (d) updateScoreboard(d);
+            if (d) {
+              firstFrameTimestamp = d.frames?.[0]?.rfc460Timestamp || '';
+              updateScoreboard(d);
+            }
           }).catch(() => {});
 
           poll();
